@@ -26,7 +26,7 @@ def tratar_dados(pdd, dados):
     ic = 0
     while ic < contador_linhas:
         valores = [(pedido, data, cliente, produto[ic], valor[ic], qtd[ic])]
-        print(valores)
+        #print(valores)
         cursor.executemany("INSERT INTO pedidos VALUES (?,?,?,?,?,?)",valores)
         ic += 1 
 
