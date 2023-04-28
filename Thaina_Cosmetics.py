@@ -1,45 +1,20 @@
 import sqlite3
+import Back_Thaina
 import PySimpleGUI as sg
+import pandas as pd
 from datetime import datetime
-
-banco = sqlite3.connect(r'C:\Users\lucas\OneDrive\Área de Trabalho\Projeto - Thaina Cosmetics\ThainaCosmetics.db')
-cursor = banco.cursor()
-
-def tratar_dados(pdd, dados):
-    data = datetime.now().strftime('%d/%m/%Y')
-    pedido = pdd
-    cliente = dados['-Cliente-']
-    contador_linhas = 0
-    produto = []
-    valor = []
-    qtd = []
-    
-    for i in dados:
-        if 'Produto' in i:
-            produto.append(dados[i])
-            contador_linhas += 1
-        elif 'Valor' in i:
-            valor.append(dados[i])
-        elif 'Qtd' in i:
-            qtd.append(dados[i])
-    
-    ic = 0
-    while ic < contador_linhas:
-        valores = [(pedido, data, cliente, produto[ic], valor[ic], qtd[ic])]
-        #print(valores)
-        cursor.executemany("INSERT INTO pedidos VALUES (?,?,?,?,?,?)",valores)
-        ic += 1 
 
 class sistema():
 
     def janela_inicio():
         sg.theme('LightBlue1')
         layout = [  [sg.Text('Bem vindo a Thainá Cosmetics')],
-                            [sg.Text('Selecione o que deseja fazer:')],
-                            [sg.Button('Novo Pedido')],
-                            [sg.Button('Sair')] ]
+                    [sg.Text('Selecione o que deseja fazer:')],
+                    [sg.Button('Novo Pedido'), sg.Button('Consultar Pedido')],
+                    [sg.Button('Sair')] ]
 
-        janela_inicio = sg.Window('Thainá Cosmetics', layout)
+        janela_inicio = sg.Window('Thainá Cosmetics', layout, resizable=True, finalize=True, size=(280,125))
+
         event,values = janela_inicio.read()
         while True:
             if event in (sg.WIN_CLOSED, 'Sair'):
@@ -48,46 +23,88 @@ class sistema():
                 janela_inicio.close()
                 sistema.adicionar_pedido()
                 break
+            elif event == 'Consultar Pedido':
+                janela_inicio.close()
+                sistema.consultar_pedido()
+                break
         janela_inicio.close()
 
     def adicionar_pedido():
-        try:
-            cursor.execute('SELECT MAX(pedido) FROM pedidos')
-            pedido = ((cursor.fetchall())[0][0])+1
-        except:
-            pedido = 1
-
-        def new_layout(i):
-            return [[sg.Text(f'Produto {i}:', size=(9,1)), sg.InputText(size=(25,i),k=(f'-Produto {i}-')),sg.Text('Valor:'), sg.InputText(size=(10,1),k=(f'-Valor {i}-')),sg.Text('Quantidade:'), sg.InputText(size=(5,1),k=(f'-Qtd {i}-'))]]
-        
-        linha_pedido = [[sg.Text('Produto 1:', size=(9,1)), sg.InputText(size=(25,0),k=('-Produto 1-')),sg.Text('Valor:'), sg.InputText(size=(10,1),k=(f'-Valor 1-')),sg.Text('Quantidade:'), sg.InputText(size=(5,1),k=('-Qtd 1-'))]]
-
-        layout = [[sg.Text('Adicionar novo pedido')],
-                  [sg.Text('Cliente:', size=(10,1)), sg.InputText(size=(25,0),k='-Cliente-'), sg.Button('Novo Produto')],
-                  [sg.Column(linha_pedido, key='-Column-')],
-                  [sg.Button('Sair'), sg.Button('Ok')]]
+        info_pedido = []
+        heading = ['Produto', 'Valor', 'Quantidade','Total']
+        layout = [  [sg.Text('Bem vindo a Thainá Cosmetics')],
+                    [sg.Text('Cliente:'),sg.InputText(k=('-CLIENTE-'), do_not_clear=True)],
+                    [sg.Text('Produto:'), sg.Input(size=(25,0),k=('-PRODUTO-'), do_not_clear=False ),
+                    sg.Text('Valor:'), sg.InputText(size=(10,1),k=('-VALOR-'), do_not_clear=False),
+                    sg.Text('Quantidade:'), sg.InputText(size=(5,1),k=('-QTD-'), do_not_clear=False)],
+                    [sg.Button('Adicionar Produto')],
+                    [sg.Table(values=info_pedido, headings=heading,
+                    key='-TABELA-',
+                    auto_size_columns=True,
+                    display_row_numbers=False,
+                    alternating_row_color='white',
+                    justification='center')],
+                    #[sg.Button('Quantidade de Produtos:'), sg.Text('Total do Pedido:')],
+                    [sg.Button('Registrar Pedido'),sg.Button('Sair')] ]
 
         janela_novo_pedido = sg.Window('Novo Pedido', layout, resizable=True)
-        qtd_pedido = 2
         while True:
             event,values = janela_novo_pedido.read()
             if event in (sg.WIN_CLOSED, 'Sair'):
-                janela_novo_pedido.close()
                 break
-            elif event == 'Novo Produto':
-                if qtd_pedido <= 20:
-                    janela_novo_pedido.extend_layout(janela_novo_pedido['-Column-'],new_layout(qtd_pedido))
-                    qtd_pedido += 1
-                else:
-                    sg.Popup('Limite de produtos atingidos')
-                    janela_novo_pedido['Novo Produto'].update(visible=False)
-            elif event == 'Ok':
-                janela_novo_pedido.close()
-                tratar_dados(pedido, values)
+            elif event == 'Adicionar Produto':
+                total_produto = Back_Thaina.totalizando_produto((values['-VALOR-']), values['-QTD-'])
+                info = [values['-PRODUTO-'], values['-VALOR-'], values['-QTD-'], total_produto]
+                info_pedido.append(info)
+                janela_novo_pedido['-TABELA-'].update(values=info_pedido)
+            elif event == 'Registrar Pedido':
+                Back_Thaina.tratar_dados(Back_Thaina.numero_pedido(),values['-CLIENTE-'], info_pedido)
                 break
+        janela_novo_pedido.close()
         sistema.janela_inicio()
+    
+    def consultar_pedido():
+        info_consulta = Back_Thaina.consultar_tudo()
+        heading = ['Pedido','Data','Cliente','Produto', 'Valor', 'Quantidade']
 
+        layout = [[sg.Text('Consultar Pedido')],
+                  [sg.Text('Digite o nome do cliente:'), sg.InputText(size=(25,0),k='-CLIENTE-')],
+                  [sg.Text('Digite o número do pedido:'), sg.InputText(size=(25,0),k='-PEDIDO-')],
+                  [sg.Button('Consultar', k='-CONSULTAR-')],
+                  [sg.Table(values=info_consulta, headings=heading,
+                    key='-TABELA-',
+                    auto_size_columns=True,
+                    display_row_numbers=False,
+                    alternating_row_color='white',
+                    justification='center')],
+                  [sg.Button('Sair')]]
 
+        janela_consultar_pedido = sg.Window('Consultar Pedido', layout, resizable=True)
+
+        while True:
+            event,values = janela_consultar_pedido.read()
+            if event in (sg.WIN_CLOSED, 'Sair'):
+                break
+            elif '-CONSULTAR-' in event:
+                if values['-CLIENTE-'] != '':
+                    cliente = Back_Thaina.consultar_cliente(values['-CLIENTE-'])
+                    if len(cliente) == 0 :
+                        sg.popup('Cliente não encontrado!')
+                    else:
+                        janela_consultar_pedido['-TABELA-'].update(values=cliente)
+                elif values['-PEDIDO-'] != '':
+                    pedido = Back_Thaina.consultar_pedido(values['-PEDIDO-'])
+                    if len(pedido) == 0 :
+                        sg.popup('Pedido não encontrado!')
+                    else:
+                        janela_consultar_pedido['-TABELA-'].update(values=pedido)
+                else:
+                    sg.popup('Digite nome do cliente ou número do pedido!')
+                    janela_consultar_pedido['-TABELA-'].update(values=info_consulta)
+            elif event == 'Ok':
+                sg.popup('Ok')
+                break
+        janela_consultar_pedido.close()
+        sistema.janela_inicio()
+        
 sistema.janela_inicio()
-banco.commit()
-banco.close()
