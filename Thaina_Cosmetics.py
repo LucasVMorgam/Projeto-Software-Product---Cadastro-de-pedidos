@@ -8,12 +8,12 @@ class sistema():
 
     def janela_inicio():
         sg.theme('LightBlue1')
-        layout = [  [sg.Text('Bem vindo a Thainá Cosmetics')],
-                    [sg.Text('Selecione o que deseja fazer:')],
+        layout = [  [sg.Text('Bem vindo a Thainá Cosmetics', font=('Arial Bold',12))],
+                    [sg.Text('Selecione o que deseja fazer:', text_color='Black')],
                     [sg.Button('Novo Pedido'), sg.Button('Consultar Pedido')],
                     [sg.Button('Sair')] ]
 
-        janela_inicio = sg.Window('Thainá Cosmetics', layout, resizable=True, finalize=True, size=(280,125))
+        janela_inicio = sg.Window('Thainá Cosmetics', layout, resizable=True, finalize=True)
 
         event,values = janela_inicio.read()
         while True:
@@ -43,14 +43,15 @@ class sistema():
                     auto_size_columns=True,
                     display_row_numbers=False,
                     alternating_row_color='white',
-                    justification='center')],
-                    #[sg.Button('Quantidade de Produtos:'), sg.Text('Total do Pedido:')],
-                    [sg.Button('Registrar Pedido'),sg.Button('Sair')] ]
+                    justification='center',
+                    enable_events=True,
+                    enable_click_events=True)],
+                    [sg.Button('Registrar Pedido'),sg.Button('Voltar')] ]
 
         janela_novo_pedido = sg.Window('Novo Pedido', layout, resizable=True)
         while True:
             event,values = janela_novo_pedido.read()
-            if event in (sg.WIN_CLOSED, 'Sair'):
+            if event in (sg.WIN_CLOSED, 'Voltar'):
                 break
             elif event == 'Adicionar Produto':
                 total_produto = Back_Thaina.totalizando_produto((values['-VALOR-']), values['-QTD-'])
@@ -70,20 +71,21 @@ class sistema():
         layout = [[sg.Text('Consultar Pedido')],
                   [sg.Text('Digite o nome do cliente:'), sg.InputText(size=(25,0),k='-CLIENTE-')],
                   [sg.Text('Digite o número do pedido:'), sg.InputText(size=(25,0),k='-PEDIDO-')],
-                  [sg.Button('Consultar', k='-CONSULTAR-')],
+                  [sg.Button('Consultar', k='-CONSULTAR-'), sg.Button('Excluir Pedido', k='-EXCLUIR-')],
                   [sg.Table(values=info_consulta, headings=heading,
-                    key='-TABELA-',
                     auto_size_columns=True,
                     display_row_numbers=False,
                     alternating_row_color='white',
-                    justification='center')],
-                  [sg.Button('Sair')]]
+                    justification='center',
+                    enable_events=True,
+                    key='-TABELA-')],
+                  [sg.Button('Voltar')]]
 
-        janela_consultar_pedido = sg.Window('Consultar Pedido', layout, resizable=True)
-
+        janela_consultar_pedido = sg.Window('Consultar Pedido', layout, resizable=True, modal=True)
+        seleção = ''
         while True:
             event,values = janela_consultar_pedido.read()
-            if event in (sg.WIN_CLOSED, 'Sair'):
+            if event in (sg.WIN_CLOSED, 'Voltar'):
                 break
             elif '-CONSULTAR-' in event:
                 if values['-CLIENTE-'] != '':
@@ -101,10 +103,56 @@ class sistema():
                 else:
                     sg.popup('Digite nome do cliente ou número do pedido!')
                     janela_consultar_pedido['-TABELA-'].update(values=info_consulta)
-            elif event == 'Ok':
-                sg.popup('Ok')
+            elif '-EXCLUIR-' in event:
+                if values['-PEDIDO-'] != '':
+                    retorno = Back_Thaina.excluir_pedido(values['-PEDIDO-'])
+                    if retorno == 'Pedido não encontrado':
+                        sg.popup('Pedido não encontrado')
+                    else:
+                        sg.popup('Pedido Excluido!')
+                        janela_consultar_pedido.close()
+                        sistema.consultar_pedido()
+            elif event == '-TABELA-':
+                pedido_selecionado = values['-TABELA-'][0]
+                seleção = info_consulta[pedido_selecionado]
+                janela_consultar_pedido.close()
+                sistema.atualizar_excluir_pedido(seleção)
                 break
+
         janela_consultar_pedido.close()
         sistema.janela_inicio()
+
+    def atualizar_excluir_pedido(linha_selecionada):
+        antigo = linha_selecionada
+        layout = [[sg.Text('Data:'),sg.InputText(f'{linha_selecionada[1]}', k='-NOVA DATA-')],
+                  [sg.Text('Cliente:'), sg.InputText(f'{linha_selecionada[2]}',k='-NOVO CLIENTE-')],
+                  [sg.Text('Produto:'), sg.InputText(f'{linha_selecionada[3]}', k='-NOVO PRODUTO-')],
+                  [sg.Text('Valor:'), sg.InputText(f'{linha_selecionada[4]}', k='-NOVO VALOR-')],
+                  [sg.Text('Quantidade:'), sg.InputText(f'{linha_selecionada[5]}', k='-NOVA QTD-')],
+                  [sg.Button('Atualizar Pedido'), sg.Button('Excluir Produto')],
+                  [sg.Button('Sair')] ]
         
+        janela_editar = sg.Window('Editar Pedido', layout, resizable=True, modal=True)
+        while True:
+            event,values = janela_editar.read()
+            if event in (sg.WIN_CLOSED, 'Sair'):
+                break
+            elif event == 'Atualizar Pedido':
+                retorno = Back_Thaina.atualizar_pedido(antigo, values)
+                if retorno == 'Valores iguais':
+                    sg.popup('Valores iguais, não houve alteração!')
+                else:
+                    sg.popup('Pedido atualizado!')
+                    break
+            elif event == 'Excluir Produto':
+                retorno = Back_Thaina.excluir_linha(antigo)
+                if retorno == 'Pedido não encontrado':
+                    sg.popup('Produto não encontrado! Verifique novamente!')
+                else:
+                    sg.popup('Produto excluido!')
+                    break
+        
+        janela_editar.close()
+        sistema.consultar_pedido()
+
 sistema.janela_inicio()
